@@ -1,0 +1,73 @@
+{
+ "today": "2026-10-24",
+ "macro": {
+  "day_type": "ON",
+  "allenato_oggi": false,
+  "pianificato_oggi": "Lower A",
+  "pasti": 3,
+  "kcal": 1430.5,
+  "p": 128,
+  "c": 140,
+  "f": 41,
+  "on_target_kcal": 2400,
+  "on_target_p": 200,
+  "on_target_c": 243,
+  "on_target_f": 70,
+  "off_target_kcal": 1975,
+  "off_target_p": 200,
+  "off_target_c": 149,
+  "off_target_f": 65
+ },
+ "weight": {
+  "peso": 90.1,
+  "data": "2026-10-21",
+  "delta7": -0.9
+ },
+ "workouts": {
+  "ultimo_lower_a": "2026-10-06",
+  "ultimo_lower_b": "2026-10-09",
+  "ultimo_upper_push": "2026-10-07",
+  "ultimo_upper_pull": "2026-10-10",
+  "ultimo_cardio": "2026-10-19",
+  "pesi_30gg": 10,
+  "cardio_30gg": 11,
+  "settimana_pesi": 0,
+  "settimana_cardio": 1
+ },
+ "calendar": {
+  "md": "| L | M | M | G | V | S | D |\n|:-:|:-:|:-:|:-:|:-:|:-:|:-:|\n| 19<br>🚶 | 20 | 21 | 22 | 23<br>⚪LB | **[24]**<br>⚪LA | 25 |\n| 26<br>⚪PS | 27 | 28<br>⚪PL | 29 | 30 | 31 |   |\n\n🟢 fatto · ⚪ pianificato"
+ },
+ "lifts": {
+  "big": [
+   {
+    "lift": "Bench",
+    "w": 115,
+    "reps": 3,
+    "e1rm": 126.5,
+    "date": "2026-02-17"
+   },
+   {
+    "lift": "Squat",
+    "w": 170,
+    "reps": 3,
+    "e1rm": 187,
+    "date": "2026-02-19"
+   },
+   {
+    "lift": "Deadlift",
+    "w": 170,
+    "reps": 3,
+    "e1rm": 187,
+    "date": "2026-02-20"
+   },
+   {
+    "lift": "OHP",
+    "w": 50,
+    "reps": 5,
+    "e1rm": 58.3,
+    "date": "2025-11-10"
+   }
+  ],
+  "md": "#### 🏆 Big Lifts\n| Alzata | Top set | e1RM | Data |\n|:--|--:|--:|--:|\n| **Squat** | 170×3 | **187** | 19/02 |\n\n#### Lower B\n| Esercizio | Ultimo | Δ | Best e1RM |\n|:--|--:|:-:|--:|\n| Hip Thrust | 85×12 | ▲5 | 119 |\n\n#### Upper Pull\n| Esercizio | Ultimo | Δ | Best e1RM |\n|:--|--:|:-:|--:|\n| Alzate laterali | 25×10 | ▲10 | 33.3 |\n| Curl a martello | 10×10 | ＝ | 20 |\n| Lat machine / Trazioni | 80×9.5 | ＝ | 105.3 |\n| Pulley presa neutra | 60×12 | ＝ | 84 |\n| Rematore chest-supported / macchina | 80×10 | ▲5 | 106.7 |"
+ }
+}

@@ -1,0 +1,280 @@
+{
+ "name": "Valhalla Load Week",
+ "nodes": [
+  {
+   "name": "Load Week Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.1,
+   "position": [
+    0,
+    300
+   ],
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "valhalla-week",
+    "authentication": "headerAuth",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "webhookId": "valhalla-week"
+  },
+  {
+   "name": "Leggi Load Tracker",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    220,
+    300
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.notion.com/v1/databases/YOUR_LOAD_TRACKER_DB_ID/query",
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "notionApi",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Notion-Version",
+       "value": "2022-06-28"
+      }
+     ]
+    },
+    "sendBody": true,
+    "contentType": "json",
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ page_size: 100, sorts: [{ property: 'Data', direction: 'descending' }] }) }}",
+    "options": {
+     "timeout": 30000,
+     "pagination": {
+      "pagination": {
+       "paginationMode": "updateAParameterInEachRequest",
+       "parameters": {
+        "parameters": [
+         {
+          "type": "body",
+          "name": "start_cursor",
+          "value": "={{ $response.body.next_cursor }}"
+         }
+        ]
+       },
+       "paginationCompleteWhen": "other",
+       "completeExpression": "={{ $response.body.has_more !== true }}",
+       "limitPagesFetched": true,
+       "maxRequests": 2,
+       "requestInterval": 350
+      }
+     }
+    }
+   },
+   "executeOnce": true,
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  },
+  {
+   "name": "Prepara Settimana",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    440,
+    300
+   ],
+   "parameters": {
+    "jsCode": "// Logica del Code node di \"Valhalla Load Week\" (test: test_week.js).\n// POST /valhalla-week : prepara nel Load Tracker la settimana dopo l'ultima.\n// Sorgente = l'ultima settimana presente (quella con la data piu' recente), qualunque sia il programma:\n// stessi esercizi / giorni / range reps, date +7, Carico Presunto = Carico Usato (se non fatto: il presunto di prima).\n// Cambio programma (es. FENRIR -> MJOLNIR): basta creare a mano la prima settimana nuova, il tasto poi copia quella.\nconst LOAD_DB = 'YOUR_LOAD_TRACKER_DB_ID';\nconst asc = s => String(s == null ? '' : s).normalize('NFKD').replace(/[^\\x20-\\x7e]/g, '');\nconst num = (pr, k) => (pr[k] && typeof pr[k].number === 'number') ? pr[k].number : null;\nconst txt = (pr, k) => { const v = pr[k]; return v ? (v.title || v.rich_text || []).map(t => t.plain_text || '').join('').trim() : ''; };\nconst sel = (pr, k) => (pr[k] && pr[k].select) ? pr[k].select.name : '';\nconst day = (pr, k) => { const s = pr[k] && pr[k].date && pr[k].date.start; return s ? s.slice(0, 10) : ''; };\nconst addDays = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10);\nconst baseName = s => asc(String(s || '').replace(/\\s*\\(\\d+\\)\\s*$/, '')).toLowerCase().trim();\n\nfunction planWeek(pages) {\n  const rows = pages.map(pg => {\n    const pr = pg.properties || {};\n    return { title: txt(pr, 'Esercizio'), giorno: sel(pr, 'Giorno'), d: day(pr, 'Data'), sett: num(pr, 'Settimana'),\n      pres: num(pr, 'Carico Presunto'), used: num(pr, 'Carico Usato'), rmin: num(pr, 'Rep Min'), rmax: num(pr, 'Rep Max') };\n  }).filter(r => r.title && r.d);\n  if (!rows.length) return { ok: false, err: 'Load Tracker vuoto' };\n  const maxD = rows.reduce((m, r) => r.d > m ? r.d : m, '');\n  const N = rows.find(r => r.d === maxD).sett;\n  if (N == null) return { ok: false, err: 'ultima settimana senza numero' };\n  // stessa \"Settimana\" e date vicine: un vecchio blocco con lo stesso numero non si mescola\n  const src = rows.filter(r => r.sett === N && r.d >= addDays(maxD, -13));\n  if (!src.some(r => r.used != null)) return { ok: false, err: `settimana ${N} gia' pronta` };\n  const hist = {};   // ultimo carico usato per esercizio: presunto per chi non ne ha\n  for (const r of rows) if (r.used != null && (!hist[baseName(r.title)] || r.d > hist[baseName(r.title)].d)) hist[baseName(r.title)] = r;\n  src.sort((a, b) => a.d.localeCompare(b.d) || a.title.localeCompare(b.title));\n  const bodies = src.map(r => {\n    const h = hist[baseName(r.title)];\n    const pres = r.used != null ? r.used : r.pres != null ? r.pres : h ? h.used : null;\n    const props = {\n      'Esercizio': { title: [{ text: { content: r.title } }] },\n      'Data': { date: { start: addDays(r.d, 7) } },\n      'Settimana': { number: N + 1 },\n    };\n    if (r.giorno) props['Giorno'] = { select: { name: r.giorno } };\n    if (pres != null) props['Carico Presunto'] = { number: pres };\n    if (r.rmin != null) props['Rep Min'] = { number: r.rmin };\n    if (r.rmax != null) props['Rep Max'] = { number: r.rmax };\n    return { parent: { database_id: LOAD_DB }, properties: props };\n  });\n  const dates = bodies.map(b => b.properties.Data.date.start);\n  return { ok: true, week: N + 1, from: N, n: bodies.length, miss: src.filter(r => r.used == null).length,\n    d: [dates[0].slice(8, 10) + '/' + dates[0].slice(5, 7), dates[dates.length - 1].slice(8, 10) + '/' + dates[dates.length - 1].slice(5, 7)], bodies };\n}\n\n\nconst pages = $('Leggi Load Tracker').all().flatMap(i => (i.json && i.json.results) || []);\nreturn [{ json: planWeek(pages) }];\n"
+   }
+  },
+  {
+   "name": "OK?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    660,
+    300
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "ok",
+       "leftValue": "={{ $json.ok }}",
+       "rightValue": true,
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "looseTypeValidation": true,
+    "options": {}
+   }
+  },
+  {
+   "name": "Rispondi OK",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.5,
+   "position": [
+    880,
+    200
+   ],
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ JSON.stringify({ ok: $json.ok, week: $json.week, from: $json.from, n: $json.n, miss: $json.miss, d: $json.d, err: $json.err }) }}",
+    "options": {}
+   }
+  },
+  {
+   "name": "Rispondi Errore",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.5,
+   "position": [
+    880,
+    420
+   ],
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ JSON.stringify({ ok: $json.ok, week: $json.week, from: $json.from, n: $json.n, miss: $json.miss, d: $json.d, err: $json.err }) }}",
+    "options": {}
+   }
+  },
+  {
+   "name": "Una per Pagina",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1100,
+    200
+   ],
+   "parameters": {
+    "jsCode": "return $input.first().json.bodies.map(b => ({ json: b }));"
+   }
+  },
+  {
+   "name": "Crea Riga Notion",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1320,
+    200
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.notion.com/v1/pages",
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "notionApi",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Notion-Version",
+       "value": "2022-06-28"
+      }
+     ]
+    },
+    "sendBody": true,
+    "contentType": "json",
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json) }}",
+    "options": {
+     "timeout": 30000,
+     "batching": {
+      "batch": {
+       "batchSize": 1,
+       "batchInterval": 400
+      }
+     }
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  }
+ ],
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "connections": {
+  "Load Week Webhook": {
+   "main": [
+    [
+     {
+      "node": "Leggi Load Tracker",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Leggi Load Tracker": {
+   "main": [
+    [
+     {
+      "node": "Prepara Settimana",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Prepara Settimana": {
+   "main": [
+    [
+     {
+      "node": "OK?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "OK?": {
+   "main": [
+    [
+     {
+      "node": "Rispondi OK",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Rispondi Errore",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Rispondi OK": {
+   "main": [
+    [
+     {
+      "node": "Una per Pagina",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Una per Pagina": {
+   "main": [
+    [
+     {
+      "node": "Crea Riga Notion",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ }
+}

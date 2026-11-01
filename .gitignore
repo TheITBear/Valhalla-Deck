@@ -1,0 +1,21 @@
+# segreti locali
+secrets.h
+config.json
+.env
+*.env
+
+# build e binari
+build/
+*.bin
+*.elf
+*.map
+*.uf2
+
+# copie di lavoro
+backup_*/
+
+# sistema
+.DS_Store
+Thumbs.db
+__pycache__/
+node_modules/
